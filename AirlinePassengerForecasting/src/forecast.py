@@ -24,7 +24,7 @@ import joblib
 
  
 
-from tensorflow.keras.models import load_model
+
 
  
 
@@ -104,7 +104,7 @@ class Forecaster:
 
  
 
-        model = load_model(self.model_path)
+       
 
  
 
