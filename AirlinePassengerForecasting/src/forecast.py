@@ -1,25 +1,27 @@
 import pandas as pd
+from statsmodels.tsa.arima.model import ARIMA
 
 class Forecaster:
 
     def forecast(self, df, future_months=12):
 
-        # last value
-        last_value = df["Passengers"].iloc[-1]
+        # train model
+        model = ARIMA(df["Passengers"], order=(5,1,0))
+        model_fit = model.fit()
 
-        # correct monthly dates
+        # forecast future
+        forecast_values = model_fit.forecast(steps=future_months)
+
+        # future dates
         future_dates = pd.date_range(
             start=df.index[-1],
             periods=future_months + 1,
-            freq="MS"   # month start (fixes date issue)
+            freq="MS"
         )[1:]
 
-        # simple forecast
-        future_values = [last_value] * future_months
-
+        # dataframe
         future_df = pd.DataFrame({
-            "Passengers": future_values
+            "Passengers": forecast_values
         }, index=future_dates)
 
         return future_df
-   
