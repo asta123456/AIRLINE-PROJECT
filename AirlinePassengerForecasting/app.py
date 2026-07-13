@@ -9,7 +9,7 @@ from src.forecast import Forecaster
 from src.evaluation import Evaluator
 
 # ------------------------------------------------
-# Page Configuration & Custom CSS
+# Page Configuration
 # ------------------------------------------------
 
 st.set_page_config(
@@ -17,6 +17,10 @@ st.set_page_config(
     page_icon="✈️",
     layout="wide"
 )
+
+# ------------------------------------------------
+# Custom CSS
+# ------------------------------------------------
 
 st.markdown("""
     <style>
@@ -37,7 +41,7 @@ st.markdown("""
         height: 3em;
     }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ------------------------------------------------
 # Sidebar
@@ -54,133 +58,90 @@ with st.sidebar:
 
     st.title("Settings")
     future_months = st.slider("Forecast Horizon (Months)", 1, 24, 12)
-    st.info("Adjust the slider to change the prediction window.")
 
 # ------------------------------------------------
 # Data Loading
 # ------------------------------------------------
 
-loader = DataLoader("data/airline-passengers.csv")
+loader = DataLoader()
 df = loader.load_data()
 
-# OPTIONAL: rename column for easier use
-df.rename(columns={"total_passengers": "Passengers"}, inplace=True)
+# Fix column names if needed
+if "total_passengers" in df.columns:
+    df.rename(columns={"total_passengers": "Passengers"}, inplace=True)
 
-# Ensure index is datetime
-df.index = pd.to_datetime(df.index)
-
-# ------------------------------------------------
-# Header
-# ------------------------------------------------
-
-st.title("✈️ Airline Passenger Analysis & Forecasting")
-st.caption("Predicting global travel trends using RNN")
+# Convert date column properly
+df["Month"] = pd.to_datetime(df["Month"])
+df.set_index("Month", inplace=True)
 
 # ------------------------------------------------
-# Tabs
+# Title
 # ------------------------------------------------
 
-tab1, tab2 = st.tabs(["🚀 Model Performance", "🔎 Exploratory Data Analysis"])
-
-with tab1:
-    st.subheader("Model Accuracy Metrics")
-
-    mae, mse, rmse = Evaluator().evaluate()
-
-    m1, m2, m3 = st.columns(3)
-    m1.metric("MAE", f"{mae:.2f}")
-    m2.metric("MSE", f"{mse:.2f}")
-    m3.metric("RMSE", f"{rmse:.2f}")
-
-    st.info("Lower RMSE indicates better model performance.")
-
-with tab2:
-    col_a, col_b = st.columns([1, 2])
-
-    with col_a:
-        st.subheader("Raw Data")
-        st.dataframe(df, height=350)
-
-    with col_b:
-        st.subheader("Historical Trend")
-
-        fig = px.line(
-            df,
-            x=df.index,
-            y="Passengers",
-            template="plotly_white",
-            color_discrete_sequence=['#007bff']
-        )
-
-        fig.update_layout(margin=dict(l=0, r=0, t=30, b=0))
-        st.plotly_chart(fig, use_container_width=True)
+st.title("✈️ Airline Passenger Forecasting Dashboard")
 
 # ------------------------------------------------
-# Forecast Section
+# Show Raw Data
 # ------------------------------------------------
 
-st.markdown("---")
-st.header("🔮 Generate Future Forecast")
+with st.expander("📄 View Raw Data"):
+    st.dataframe(df)
 
-if st.button("Run RNN Model"):
-    with st.spinner("Analyzing..."):
+# ------------------------------------------------
+# Visualization
+# ------------------------------------------------
 
-        forecaster = Forecaster()
-        future = forecaster.forecast(future_months)
+st.subheader("📊 Historical Passenger Data")
 
-        # ensure correct shape
-        future = future.reshape(-1)
+fig = px.line(df, y="Passengers", title="Passenger Trend Over Time")
+st.plotly_chart(fig, use_container_width=True)
 
-        last_date = df.index[-1]
+# ------------------------------------------------
+# Forecasting
+# ------------------------------------------------
 
-        future_dates = pd.date_range(
-            start=last_date + pd.DateOffset(months=1),
-            periods=future_months,
-            freq="MS"
-        )
+st.subheader("🔮 Forecast Future Passengers")
 
-        forecast_df = pd.DataFrame({
-            "Month": future_dates,
-            "Predicted Passengers": future
-        })
+forecaster = Forecaster()
+future_df = forecaster.forecast(df, future_months)
 
-    st.success(f"Forecast generated for {future_months} months!")
+# ------------------------------------------------
+# Combine Actual + Forecast
+# ------------------------------------------------
 
-    col1, col2 = st.columns([1, 2])
+fig_combined = go.Figure()
 
-    with col1:
-        st.subheader("Forecasted Values")
-        st.dataframe(forecast_df, use_container_width=True)
+fig_combined.add_trace(go.Scatter(
+    x=df.index,
+    y=df["Passengers"],
+    mode='lines',
+    name='Actual'
+))
 
-        csv = forecast_df.to_csv(index=False).encode("utf-8")
+fig_combined.add_trace(go.Scatter(
+    x=future_df.index,
+    y=future_df["Passengers"],
+    mode='lines',
+    name='Forecast'
+))
 
-        st.download_button(
-            label="📥 Download CSV",
-            data=csv,
-            file_name="forecast_results.csv",
-            mime="text/csv"
-        )
+fig_combined.update_layout(title="Actual vs Forecast")
 
-    with col2:
-        st.subheader("Combined Projection")
+st.plotly_chart(fig_combined, use_container_width=True)
 
-        fig_combined = go.Figure()
+# ------------------------------------------------
+# Evaluation (Optional)
+# ------------------------------------------------
 
-        fig_combined.add_trace(go.Scatter(
-            x=df.index,
-            y=df["Passengers"],
-            name="Historical"
-        ))
+st.subheader("📈 Model Evaluation")
 
-        fig_combined.add_trace(go.Scatter(
-            x=forecast_df["Month"],
-            y=forecast_df["Predicted Passengers"],
-            name="Forecast"
-        ))
+evaluator = Evaluator()
+metrics = evaluator.evaluate(df)
 
-        fig_combined.update_layout(
-            title="Passenger Forecast vs Historical",
-            template="plotly_white"
-        )
+col1, col2 = st.columns(2)
 
-        st.plotly_chart(fig_combined, use_container_width=True)
+with col1:
+    st.metric("MAE", round(metrics["MAE"], 2))
+
+with col2:
+    st.metric("RMSE", round(metrics["RMSE"], 2))
