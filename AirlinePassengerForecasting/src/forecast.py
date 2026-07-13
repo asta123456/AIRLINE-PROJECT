@@ -1,243 +1,25 @@
-# Future forecasting
-
- 
-
-"""
-
-====================================================
-
-Module : forecast.py
-
-Project: Airline Passenger Forecasting
-
-Purpose: Forecast Future Passenger Counts
-
-====================================================
-
-"""
-
- 
-
-import numpy as np
-
-import joblib
-
- 
-
-
-
- 
-
-from src.data_loader import DataLoader
-
-from src.preprocessing import Preprocessor
-
- 
-
- 
+import pandas as pd
 
 class Forecaster:
 
- 
+    def forecast(self, df, future_months=12):
 
-    def __init__(self):
+        # last value
+        last_value = df["Passengers"].iloc[-1]
 
- 
+        # correct monthly dates
+        future_dates = pd.date_range(
+            start=df.index[-1],
+            periods=future_months + 1,
+            freq="MS"   # month start (fixes date issue)
+        )[1:]
 
-        self.data_path = "data/airline-passengers.csv"
+        # simple forecast
+        future_values = [last_value] * future_months
 
- 
+        future_df = pd.DataFrame({
+            "Passengers": future_values
+        }, index=future_dates)
 
-        self.model_path = "models/lstm_model.keras"
-
- 
-
-        self.scaler_path = "models/scaler.pkl"
-
- 
-
-        self.sequence_length = 12
-
- 
-
-    def forecast(self, future_months=12):
-
- 
-
-        # --------------------------
-
-        # Load Dataset
-
-        # --------------------------
-
- 
-
-        loader = DataLoader(self.data_path)
-
- 
-
-        df = loader.load_data()
-
- 
-
-        # --------------------------
-
-        # Scale Dataset
-
-        # --------------------------
-
- 
-
-        preprocessor = Preprocessor()
-
- 
-
-        scaled_df = preprocessor.scale_data(df)
-
- 
-
-        # --------------------------
-
-        # Load Model
-
-        # --------------------------
-
- 
-
-       
-
- 
-
-        # --------------------------
-
-        # Load Scaler
-
-        # --------------------------
-
- 
-
-        scaler = joblib.load(self.scaler_path)
-
- 
-
-        # --------------------------
-
-        # Last 12 Months
-
-        # --------------------------
-
- 
-
-        last_sequence = scaled_df.values[-self.sequence_length:]
-
- 
-
-        future_predictions = []
-
- 
-
-        # --------------------------
-
-        # Forecast Loop
-
-        # --------------------------
-
- 
-
-        for _ in range(future_months):
-
- 
-
-            input_data = last_sequence.reshape(
-
-                1,
-
-                self.sequence_length,
-
-                1
-
-            )
-
- 
-
-            prediction = model.predict(
-
-                input_data,
-
-                verbose=0
-
-            )
-
- 
-
-            future_predictions.append(prediction[0,0])
-
- 
-
-            last_sequence = np.vstack(
-
-                (
-
-                    last_sequence[1:],
-
-                    prediction
-
-                )
-
-            )
-
- 
-
-        # --------------------------
-
-        # Convert Back
-
-        # --------------------------
-
- 
-
-        future_predictions = np.array(
-
-            future_predictions
-
-        ).reshape(-1,1)
-
- 
-
-        future_predictions = scaler.inverse_transform(
-
-            future_predictions
-
-        )
-
- 
-
-        print("\nFuture Forecast Completed.")
-
- 
-
-        return future_predictions
-
-if __name__ == "__main__":
-
- 
-
-    forecaster = Forecaster()
-
- 
-
-    future = forecaster.forecast(future_months=12)
-
- 
-
-    print("\nNext 12 Month Forecast\n")
-
- 
-
-    for i, value in enumerate(future, start=1):
-
- 
-
-        print(f"Month {i} : {value[0]:.2f}")
-
+        return future_df
    
